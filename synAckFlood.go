@@ -231,17 +231,21 @@ func work(srcIp string,destIp string,destPort int,flag int,fd syscall.Handle) {
 	}
 }
 
-func main(){
+func synStart()  {
 	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_RAW, syscall.IPPROTO_TCP)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println("socket err ",err)
 		return
 	}
 	//设置IP层信息，使其能够修改IP层数据
 	err = syscall.SetsockoptInt(fd, syscall.IPPROTO_IP, 2, 1)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println("ip err ",err)
 		return
 	}
-	work(fakeIp(),"127.0.0.1",80,2,fd)
+	work(fakeIp(),"127.0.0.1",80,2,fd)//todo ack模式
+}
+
+func main(){
+	synStart()
 }
