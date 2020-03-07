@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 )
-var THREAD_NUM int64= 20  // 并发线程总数
-var	ONE_WORKER_NUM int64= 1000  //每个线程的循环次数
+var THREAD_NUM int64= 60 // 并发线程总数
+var	ONE_WORKER_NUM int64= 100  //每个线程的循环次数
 var	LOOP_SLEEP int64 = 1 // 每次请求时间间隔(毫秒)
 var ERROR_NUM int//出错数
 
@@ -28,7 +28,7 @@ func working(url string){
 	defer wg.Done()
 }
 
-func run(url string){
+func Run(url string){
 	wg.Add(int(THREAD_NUM))
 	startTime:=time.Now().UnixNano()
 	for i:=int64(0);i<THREAD_NUM;i++{
@@ -39,10 +39,6 @@ func run(url string){
 	fmt.Println("total num is ",THREAD_NUM*ONE_WORKER_NUM)
 	fmt.Println("total time is ",float64(float64(endTime-startTime)/1000000000))
 	fmt.Println("qps is ",float64(float64(THREAD_NUM)*float64(ONE_WORKER_NUM)/(float64(endTime-startTime)/1000000000)))
+	fmt.Println("true persecond is ",float64(1.0/float64(float64(THREAD_NUM)*float64(ONE_WORKER_NUM)/(float64(endTime-startTime)/1000000000))))
 	fmt.Println("error num is ",ERROR_NUM)
-}
-
-
-func main()  {
-	run("http://127.0.0.1:9090")
 }

