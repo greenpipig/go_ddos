@@ -44,12 +44,12 @@ func packUdpHeader(udpHeader UdpHeader,pstHeader PsdHeader)(UdpHeader,bytes.Buff
 	return udpHeader,buffer
 }
 
-func makeIpPacket(destIp string,srcIp string) ipv4.Header{
+func makeIpPacket(destIp string,srcIp string) *ipv4.Header{
 	destIPbyte := net.IP(make([]byte, 4))
 	binary.BigEndian.PutUint32(destIPbyte[0:4], inet_addr(destIp))
 	srcIPbyte := net.IP(make([]byte, 4))
 	binary.BigEndian.PutUint32(srcIPbyte[0:4], inet_addr(srcIp))//输入是反的需要check
-	iph := ipv4.Header{
+	iph := &ipv4.Header{
 		Version: ipv4.Version,
 		//IP头长一般是20
 		Len:  ipv4.HeaderLen,
@@ -131,7 +131,7 @@ func ParseDomainName(domain string) ([]byte,error) {
 func workDns(srcIp string,destIp string,destPort int){
 	var pstHeader PsdHeader
 	var udpHeader UdpHeader
-	var ipHeader ipv4.Header
+	var ipHeader *ipv4.Header
 	pstHeader=pstHeader.makePsdHeader(srcIp, destIp,false)
 	udpHeader=udpHeader.makeUdpHeader(destPort)
 	udpHeader,buffer:=packUdpHeader(udpHeader,pstHeader)
@@ -139,7 +139,8 @@ func workDns(srcIp string,destIp string,destPort int){
 	udpByte:=buffer.Bytes()
 	//fmt.Println(udpByte)
 	ipHeader=makeIpPacket(destIp,srcIp)
-	ipByte,err:=ipHeader.Marshal()
+	//ipByte,err:=ipHeader.Marshal()
+	_,err:=ipHeader.Marshal()
 	if err!=nil{
 		fmt.Println("ipHeader.Marshal() err:",err)
 	}
@@ -154,7 +155,22 @@ func workDns(srcIp string,destIp string,destPort int){
 	err=binary.Write(&dnsBuffer, binary.BigEndian, domainName)
 	err=binary.Write(&dnsBuffer, binary.BigEndian, dnsQuestion)
 	dnsByte:=dnsBuffer.Bytes()
+	listener, err := net.ListenPacket("ip4:udp", "127.0.0.1")
+	if err != nil {
+		fmt.Println(err)
+	}
+	defer listener.Close()
 
-
-
+	//listener 实现了net.PacketConn接口
+	r, err := ipv4.NewRawConn(listener)
+	if err != nil {
+		fmt.Println("NewRawConn: ",err)
+	}
+	buffs := make([]byte, 0)
+	buffs = append(buffs, udpByte...)
+	buffs = append(buffs, dnsByte...)
+	//发送自己构造的UDP包
+	if err = r.WriteTo(ipHeader, buffs, nil); err != nil {
+		fmt.Println("write: ",err)
+	}
 }

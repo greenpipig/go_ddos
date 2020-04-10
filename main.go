@@ -23,6 +23,6 @@ func main ()  {
 	}else{
 		judge:=HostAddrCheck("127.0.0.1:3456")
 		fmt.Println(judge)
-		workDns("127.0.0.1","23.23.23.23",45)
+		workDns(fakeIp(),"127.0.0.1",53)
 	}
 }
